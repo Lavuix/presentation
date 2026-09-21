@@ -31,11 +31,17 @@ const W = 1920, H = 1080;
 const px = (n) => n / 144;
 const pt = (n) => n / 2;
 
-const MX = 88;                 // боковое поле
-const MT = 72;                 // верхнее поле
-const MB = 72;                 // нижнее поле
-const CW = W - MX * 2;         // 1744 — ширина колонки контента
-const FOOTER_H = 60;           // зона колонтитула снизу
+const MX = 96;                 // боковое поле
+const MT = 80;                 // верхнее поле
+const MB = 80;                 // нижнее поле
+const CW = W - MX * 2;         // 1728 — ширина колонки контента
+const FOOTER_H = 64;           // зона колонтитула снизу
+
+/** Радиусы скруглений. Их три, четвёртого не выдумываем. */
+const R = { tile: 18, card: 24, big: 28, round: 999 };
+
+/** Шаг сетки и ходовые зазоры. */
+const GAP = { xs: 12, sm: 16, md: 24, lg: 32, xl: 48, xxl: 64 };
 
 function newDeck(meta = {}) {
   if (meta.theme) useTheme(meta.theme);
@@ -117,12 +123,14 @@ const pad2 = (n) => String(n).padStart(2, '0');
 // ── Подгонка кегля ───────────────────────────────────────────────────────
 // Средняя ширина символа Inter в долях кегля. Оценка грубая, но её хватает,
 // чтобы заголовок не вылез за рамку.
-const CHAR_W = (bold) => (bold ? 0.545 : 0.515);
+const CHAR_W = (bold) => (bold ? 0.57 : 0.535);
 
 function lines(text, widthPx, sizePx, bold) {
   const words = String(text || '').split(/\s+/).filter(Boolean);
   if (!words.length) return 0;
-  const max = Math.max(1, Math.floor(widthPx / (sizePx * CHAR_W(bold))));
+  // 0.96 — запас на неточность оценки: лучше посчитать лишнюю строку,
+  // чем получить текст, вылезший из рамки
+  const max = Math.max(1, Math.floor(widthPx * 0.96 / (sizePx * CHAR_W(bold))));
   let n = 1, len = 0;
   for (const w of words) {
     const add = len ? w.length + 1 : w.length;
@@ -144,6 +152,48 @@ function fit(text, { w, h, size, min = 16, bold = false, lh = 1.1 }) {
 
 /** Высота блока текста при заданном кегле. */
 const blockH = (text, w, size, bold, lh = 1.3) => lines(text, w, size, bold) * size * lh;
+
+// ── Вертикальная композиция ──────────────────────────────────────────────
+// Правило системы: блок имеет высоту своего содержимого, а не высоту зоны.
+// Свободное место не «съедается» растянутой карточкой — оно распределяется
+// в зазоры до разумного предела, а остаток уходит в оптический центр.
+
+/**
+ * Ставит блок высотой `need` в зону [top, bottom] и возвращает Y начала.
+ * Слак делится не пополам: `bias` — доля сверху (0.42 ≈ оптический центр,
+ * так блок кажется стоящим по центру, а не сползающим вниз).
+ * Если блок выше зоны — возвращает top, блок придётся ужимать.
+ */
+function place(top, bottom, need, bias = 0.42) {
+  const slack = bottom - top - need;
+  return slack <= 0 ? top : top + Math.round(slack * bias);
+}
+
+/**
+ * Ряд одинаковых строк в зоне [top, bottom]: высота строки `rowH`, шаг растёт
+ * за счёт свободного места, но не больше `max` × rowH. Остаток — в центр.
+ * → { top, step }
+ */
+function rows(top, bottom, n, rowH, o = {}) {
+  const min = o.min == null ? 16 : o.min;          // минимальный зазор
+  const max = o.max == null ? 72 : o.max;          // максимальный зазор
+  const avail = bottom - top;
+  const free = avail - rowH * n;
+  const gap = Math.max(min, Math.min(max, n > 1 ? free / (n - 1) : 0));
+  const need = rowH * n + gap * (n - 1);
+  return { top: place(top, bottom, need, o.bias), step: rowH + gap, gap, need };
+}
+
+/**
+ * Высота карточки в ряду: по самому длинному содержимому, но не выше зоны.
+ * Немного растягиваем (до `grow`), чтобы карточка не выглядела обрезанной,
+ * и никогда — на всю зону: пустая нижняя треть карточки хуже, чем воздух
+ * вокруг неё.
+ */
+function boxH(need, avail, o = {}) {
+  const grow = o.grow == null ? 1.25 : o.grow;
+  return Math.round(Math.min(avail, Math.max(need, Math.min(need * grow, avail))));
+}
 
 // ── Примитивы ────────────────────────────────────────────────────────────
 
@@ -168,6 +218,7 @@ function txt(s, body, o) {
     fontFace: o.font || FONT, fontSize: pt(o.size),
     color: hex(o.color || C.ink), bold: !!o.bold,
     align: o.align || 'left', valign: o.valign || 'top',
+    ...(o.rotate ? { rotate: o.rotate } : {}),
     lineSpacing: pt(o.size * (o.lh || 1.25)),
     charSpacing: o.spacing,
   });
@@ -190,6 +241,44 @@ function ellipse(s, p, o) {
     fill: { color: hex(o.fill), ...(o.transparency ? { transparency: o.transparency } : {}) },
     line: NOLINE,
   });
+}
+
+/**
+ * Стрелка по ортогональной ломаной: pts — массив точек [[x, y], …].
+ * Наконечник получает последний сегмент. Полилиний у pptxgenjs нет, поэтому
+ * ломаная рисуется отрезками; горизонтальные и вертикальные ложатся в сетку
+ * точно, диагональные тоже работают.
+ */
+function arrow(s, p, pts, o = {}) {
+  const color = hex(o.color || C.lineStrong), width = o.width || 2;
+  for (let i = 1; i < pts.length; i++) {
+    const [x1, y1] = pts[i - 1], [x2, y2] = pts[i];
+    const line = { color, width, ...(o.dash ? { dashType: o.dash } : {}) };
+    if (i === pts.length - 1 && o.head !== false) line.endArrowType = o.head || 'triangle';
+    if (i === 1 && o.tail) line.beginArrowType = o.tail;
+    s.addShape(p.ShapeType.line, {
+      x: px(Math.min(x1, x2)), y: px(Math.min(y1, y2)),
+      w: px(Math.abs(x2 - x1)), h: px(Math.abs(y2 - y1)),
+      flipH: x2 < x1, flipV: y2 < y1, line,
+    });
+  }
+}
+
+/** Ромб — узел решения в блок-схеме. */
+function diamond(s, p, o) {
+  s.addShape(p.ShapeType.diamond, {
+    x: px(o.x), y: px(o.y), w: px(o.w), h: px(o.h),
+    fill: o.fill ? { color: hex(o.fill) } : { color: 'FFFFFF', transparency: 100 },
+    line: o.line ? { color: hex(o.line.color), width: o.line.width || 2, dashType: o.line.dash } : NOLINE,
+  });
+}
+
+/** Плашка-пилюля: счётчик, метка периода, подпись «сейчас». */
+function pill(s, p, o) {
+  const h = o.h || 44;
+  rect(s, p, { x: o.x, y: o.y, w: o.w, h, r: h / 2, fill: o.fill });
+  txt(s, o.text, { x: o.x, y: o.y + (h - (o.size || T.caption) * 1.2) / 2, w: o.w, h: h - 8,
+    size: o.size || T.caption, bold: true, color: o.color || C.onAccent, align: 'center' });
 }
 
 function hline(s, p, o) {
@@ -227,14 +316,14 @@ function bullets(s, items, o) {
 /** Колонтитул контентного слайда: подпись слева, номер страницы справа. */
 function footer(s, p, { label, no, total, rule = false }) {
   edgeBar(s, p);
-  const y = H - MB - 30;
-  if (rule) hline(s, p, { x: MX, y: y - 26, w: CW, color: C.n20, width: 2 });
-  if (label) txt(s, label, { x: MX, y, w: CW - 320, h: 34, size: T.caption, color: C.soft, font: MONO || FONT });
+  const y = H - MB - 34;
+  if (rule) hline(s, p, { x: MX, y: y - 28, w: CW, color: C.line, width: 1 });
+  if (label) txt(s, label, { x: MX, y, w: CW - 320, h: 30, size: T.caption, color: C.soft, font: MONO || FONT });
   if (no) {
     s.addText([
-      { text: pad2(no), options: { bold: true, color: hex(C.ink), fontSize: pt(T.caption) } },
+      { text: pad2(no), options: { bold: true, color: hex(C.muted), fontSize: pt(T.caption) } },
       { text: ` / ${total}`, options: { color: hex(C.faint), fontSize: pt(T.caption) } },
-    ], { x: px(MX + CW - 320), y: px(y), w: px(320), h: px(34), isTextBox: true, margin: 0, align: 'right', fontFace: MONO || FONT });
+    ], { x: px(MX + CW - 320), y: px(y), w: px(320), h: px(30), isTextBox: true, margin: 0, align: 'right', fontFace: MONO || FONT });
   }
 }
 
@@ -249,23 +338,35 @@ function header(s, { eyebrow, title, lead, accentColor, w = CW, maxH = 200 }) {
   accentColor = accentColor || C.accent;
   let y = MT;
   if (eyebrow) {
-    txt(s, String(eyebrow).toUpperCase(), { x: MX, y, w, h: 34, size: T.eyebrow, bold: true, color: accentColor, spacing: 2, font: MONO || FONT });
-    y += 46;
+    txt(s, String(eyebrow).toUpperCase(), { x: MX, y, w, h: 30, size: T.eyebrow, bold: true, color: accentColor, spacing: 2.4, font: MONO || FONT });
+    y += 42;
   }
   if (title) {
-    const f = fit(title, { w, h: maxH, size: T.h2, min: 40, bold: true, lh: 1.08 });
-    const h = f.lines * f.size * 1.08;
-    txt(s, title, { x: MX, y, w, h: h + 8, size: f.size, bold: true, color: C.ink, lh: 1.08 });
-    y += h + (lead ? 20 : 40);
+    const f = fit(title, { w, h: maxH, size: T.h2, min: 40, bold: true, lh: 1.06 });
+    const h = f.lines * f.size * 1.06;
+    txt(s, title, { x: MX, y, w, h: h + 8, size: f.size, bold: true, color: C.ink, lh: 1.06 });
+    y += h + (lead ? 18 : 48);
   }
   if (lead) {
-    const lw = Math.min(w, 1360);
+    const lw = Math.min(w, 1280);
     const f = fit(lead, { w: lw, h: 140, size: T.lead, min: 24, lh: 1.4 });
     const h = f.lines * f.size * 1.4;
     txt(s, lead, { x: MX, y, w: lw, h: h + 6, size: f.size, color: C.muted, lh: 1.4 });
-    y += h + 44;
+    y += h + 56;
   }
-  return y;
+  return Math.round(y);
+}
+
+/**
+ * Плитка с иконкой: скруглённый квадрат заливки и иконка по центру.
+ * Иконки нет в спрайте или нет sharp — возвращает false, и сниппет сам решает,
+ * что поставить вместо неё.
+ */
+async function tile(s, p, o) {
+  const size = o.size || 72;
+  rect(s, p, { x: o.x, y: o.y, w: size, h: size, r: o.r == null ? R.tile : o.r, fill: o.fill });
+  const g = Math.round(size * 0.46);
+  return putIcon(s, o.icon, o.color, { x: o.x + (size - g) / 2, y: o.y + (size - g) / 2, w: g });
 }
 
 // ── Ассеты ───────────────────────────────────────────────────────────────
@@ -330,10 +431,10 @@ function picture(s, p, o) {
   }
   const rose = o.tone === 'rose';
   const bg = rose ? C.accentTint : C.surface, bd = rose ? C.red35 : C.lineStrong, fg = rose ? C.red35 : C.soft;
-  rect(s, p, { x: o.x, y: o.y, w: o.w, h: o.h, fill: bg, r: o.r == null ? 32 : o.r, line: { color: bd, width: 2, dash: 'dash' } });
+  rect(s, p, { x: o.x, y: o.y, w: o.w, h: o.h, fill: bg, r: o.r == null ? R.big : o.r, line: { color: bd, width: 2, dash: 'dash' } });
   const note = o.note || `вставьте ${Math.round(o.w)}×${Math.round(o.h)}`;
-  txt(s, 'Изображение', { x: o.x + 20, y: o.y + o.h / 2 - 40, w: o.w - 40, h: 40, size: 30, bold: true, color: fg, align: 'center' });
-  txt(s, note, { x: o.x + 20, y: o.y + o.h / 2 + 4, w: o.w - 40, h: 40, size: 24, color: fg, align: 'center' });
+  txt(s, 'Изображение', { x: o.x + 20, y: o.y + o.h / 2 - 38, w: o.w - 40, h: 38, size: T.h4, bold: true, color: fg, align: 'center' });
+  txt(s, note, { x: o.x + 20, y: o.y + o.h / 2 + 4, w: o.w - 40, h: 36, size: T.small, color: fg, align: 'center' });
   return false;
 }
 
@@ -445,12 +546,12 @@ const coverInk = () => ({
 });
 
 module.exports = {
-  W, H, px, pt, MX, MT, MB, CW, FOOTER_H, newDeck,
+  W, H, px, pt, MX, MT, MB, CW, FOOTER_H, R, GAP, newDeck,
   C, ACCENTS, accent, T, hex, NOLINE, pad2,
   THEMES, theme, useTheme, prepare, coverBg, coverInk, edgeBar,
   glowLayer, barImage, markImage,
-  lines, fit, blockH, txt, rect, ellipse, hline, bullets,
-  footer, contentBottom, header,
+  lines, fit, blockH, place, rows, boxH, txt, rect, ellipse, hline, bullets, arrow, diamond, pill,
+  footer, contentBottom, header, tile,
   assetPath, icon, putIcon, logo, picture,
 };
 

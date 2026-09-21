@@ -84,11 +84,11 @@ const BRAND_ACCENTS = [
   { key: 'yellow', solid: '#b18b2b', tint: '#fdf3ac', deep: '#5f5819' },
 ];
 
-/** Шкала кеглей в px макета 1920×1080. */
+/** Шкала кеглей в px макета 1920×1080. Пять рабочих размеров плюс крупные. */
 const BRAND_TYPE = {
-  display: 120, h1: 108, h2: 68, h3: 36, h4: 30,
-  lead: 32, body: 28, small: 24, caption: 22, eyebrow: 28,
-  metric: 112, quote: 60,
+  display: 104, h1: 76, h2: 64, h3: 34, h4: 28,
+  lead: 30, body: 26, small: 24, caption: 20, eyebrow: 22,
+  metric: 132, quote: 56,
 };
 
 // ── TN Digital ───────────────────────────────────────────────────────────
@@ -207,11 +207,11 @@ const THEMES = {
     colors: DIGITAL,
     accents: DIGITAL_ACCENTS,
     semantic: DIGITAL_SEMANTIC,
-    // Крупные кегли — свои: они подбираются fit()-ом и всегда укладываются.
-    // Основной текст (body, small, h3, h4) остаётся брендовым: под него
-    // выверена геометрия карточек, и увеличение кегля ломает вёрстку.
+    // Mulish шире Inter, поэтому крупные кегли чуть мельче — иначе заголовок
+    // на обложке уезжает в три строки. Рабочие размеры общие для всех тем:
+    // геометрия карточек считается по ним.
     type: Object.assign({}, BRAND_TYPE, {
-      display: 112, h1: 96, h2: 66, caption: 24, eyebrow: 24, quote: 58,
+      display: 98, h1: 72, h2: 62, quote: 54,
     }),
     logo: 'logo-black-rus.png',
     cover: {

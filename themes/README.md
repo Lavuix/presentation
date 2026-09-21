@@ -38,7 +38,7 @@ node examples/themes/build.js digital    # одна
 ```
 
 Рядом со скриптом появятся `tn-brand.pptx`, `tn-division.pptx`,
-`tn-digital.pptx`, `tn-dark.pptx`. В каждой деке — **все 17 макетов** на своих
+`tn-digital.pptx`, `tn-dark.pptx`. В каждой деке — **все 28 макетов** на своих
 слайдах: титул, разделители, агенда, метрики, features, cards, таблица,
 диаграмма, process, timeline, compare, bullets, split, image, quote, statement,
 финал. Открой и выбери.

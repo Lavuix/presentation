@@ -4,12 +4,17 @@
 
 Сниппеты предполагают подключённый пролог — см. [README.md](README.md).
 
+Общее правило этих макетов: высота строки или карточки считается по содержимому,
+свободное место уходит в межстрочные зазоры и в оптический центр, а не в растянутую
+пустую карточку. Помогают три примитива пролога — `TN.rows()`, `TN.boxH()`
+и `TN.place()`, см. [rules/layout.md](../rules/layout.md).
+
 ## `agenda` — оглавление
 
 ![agenda](../examples/tn-life-strategy/preview/02-agenda.jpg)
 
 Что будет в деке. Номера раскрашены по акцентам, под каждым пунктом —
-поясняющая строка, снизу тонкая линейка.
+поясняющая строка, между пунктами — тонкая линейка.
 
 От 4 до 10 пунктов. Больше 5 — автоматически в две колонки. Пояснение под пунктом
 не обязательно, но с ним оглавление становится кратким пересказом, а не списком
@@ -33,22 +38,31 @@ function agenda(p, d) {
   s.background = { color: TN.hex(C.bg) };
   const y0 = TN.header(s, d);
 
-  const items = d.items;
+  const items = d.items.slice(0, 10);
   const cols = d.columns || (items.length > 5 ? 2 : 1);
-  const gap = 72, colW = Math.floor((CW - gap * (cols - 1)) / cols);
-  const rows = Math.ceil(items.length / cols);
-  const avail = TN.contentBottom() - y0;
-  const rowH = Math.max(96, Math.min(168, Math.floor(avail / rows)));
-  const top = y0 + Math.max(0, (avail - rowH * rows) / 2);
+  const gap = 80, colW = Math.floor((CW - gap * (cols - 1)) / cols);
+  const numW = 76, tw = colW - numW;
+
+  // высота строки — по самой длинной паре «название + пояснение»
+  let rowH = 0;
+  for (const it of items) {
+    const tH = TN.blockH(it.title, tw, T.h4, true, 1.2);
+    const nH = it.note ? TN.blockH(it.note, tw, T.small, false, 1.35) + 10 : 0;
+    rowH = Math.max(rowH, tH + nH);
+  }
+  const n = Math.ceil(items.length / cols);
+  const { top, step, gap: rg } = TN.rows(y0, TN.contentBottom(), n, rowH, { min: 32, max: 132, bias: 0.38 });
 
   items.forEach((it, i) => {
     const a = TN.accent(i, it.tone);
     const x = MX + (i % cols) * (colW + gap);
-    const y = top + Math.floor(i / cols) * rowH;
-    TN.txt(s, TN.pad2(it.number || i + 1), { x, y: y + 2, w: 70, h: 44, size: 32, bold: true, color: a.solid });
-    TN.txt(s, it.title, { x: x + 86, y, w: colW - 86, h: 42, size: 30, bold: true, lh: 1.15 });
-    if (it.note) TN.txt(s, it.note, { x: x + 86, y: y + 46, w: colW - 86, h: rowH - 74, size: 23, color: C.n60, lh: 1.35 });
-    TN.hline(s, p, { x, y: y + rowH - 24, w: colW });
+    const y = top + Math.floor(i / cols) * step;
+    if (i >= cols) TN.hline(s, p, { x, y: Math.round(y - rg / 2), w: colW, color: C.line, width: 1 });
+
+    TN.txt(s, TN.pad2(it.number || i + 1), { x, y: y + 2, w: numW - 16, h: 40, size: T.h4, bold: true, color: a.solid });
+    const tH = TN.blockH(it.title, tw, T.h4, true, 1.2);
+    TN.txt(s, it.title, { x: x + numW, y, w: tw, h: tH + 6, size: T.h4, bold: true, lh: 1.2 });
+    if (it.note) TN.txt(s, it.note, { x: x + numW, y: y + tH + 10, w: tw, h: rowH - tH, size: T.small, color: C.muted, lh: 1.35 });
   });
   chrome(s, p);
 }
@@ -73,13 +87,15 @@ agenda(p, {
 
 ## `bullets` — маркированный список
 
-![bullets](../examples/tn-life-strategy/preview/14-bullets.jpg)
+![bullets](../examples/tn-life-strategy/preview/26-bullets.jpg)
 
 Простое перечисление, когда иллюстрировать нечего. Самый скучный макет —
 применяй, когда остальные не подходят, и не два раза подряд.
 
 Элемент — либо строка, либо `{ title, text }`: тогда получается «**Заголовок** — текст».
-До 8 пунктов; больше — либо две колонки, либо два слайда.
+Кегль подбирается под количество пунктов, чтобы список занимал колонку, а не жался
+к заголовку: четыре пункта набираются крупно, восемь — мельче. До 8 пунктов;
+больше — либо две колонки, либо два слайда.
 
 | Поле | Значение |
 |---|---|
@@ -87,6 +103,7 @@ agenda(p, {
 | `lead` | лид |
 | `columns` | 1 или 2 |
 | `items` | массив строк или `{ title, text }` |
+| `size` | зафиксировать кегль вместо автоподбора |
 | `tone` | `light` — серый фон слайда |
 
 <details><summary>Сниппет</summary>
@@ -97,13 +114,35 @@ function bulletsSlide(p, d) {
   s.background = { color: TN.hex(d.tone === 'light' ? C.surface : C.bg) };
   const y0 = TN.header(s, d);
 
+  const items = d.items;
   const cols = d.columns || 1;
-  const gap = 80, colW = Math.floor((CW - gap * (cols - 1)) / cols);
-  const per = Math.ceil(d.items.length / cols);
-  const size = d.items.length > 8 ? 26 : T.body;
+  const gap = 88, colW = Math.floor((CW - gap * (cols - 1)) / cols);
+  const per = Math.ceil(items.length / cols);
+  const avail = TN.contentBottom() - y0;
+  const text = (it) => (it && typeof it === 'object' ? [it.title, it.text].filter(Boolean).join(' — ') : String(it));
+
+  // высота списка при заданном кегле: строки плюс отбивки между пунктами
+  const listH = (part, size, sp) => part.reduce((h, it) => h + TN.blockH(text(it), colW - 44, size, false, 1.4), 0) + sp * (part.length - 1);
+
+  // самый крупный кегль, при котором самая длинная колонка укладывается в зону
+  let size = d.size || T.small, sp = 18;
+  if (!d.size) {
+    for (const cand of [T.body + 8, T.body + 4, T.body, T.small + 2, T.small]) {
+      const s2 = Math.round(cand * 0.7);
+      const max = Math.max(...Array.from({ length: cols }, (_, c) => listH(items.slice(c * per, (c + 1) * per), cand, s2)));
+      if (max <= avail * 0.94) { size = cand; sp = s2; break; }
+    }
+  }
+
+  // свободное место уходит в отбивки между пунктами, а не в пустоту под списком
+  const textH = Math.max(...Array.from({ length: cols }, (_, c) => listH(items.slice(c * per, (c + 1) * per), size, 0)));
+  if (!d.size && per > 1) sp = Math.max(sp, Math.min(size * 1.8, (avail * 0.88 - textH) / (per - 1)));
+  const need = textH + sp * (per - 1);
+  const top = TN.place(y0, TN.contentBottom(), need, 0.3);
+
   for (let c = 0; c < cols; c++) {
-    const part = d.items.slice(c * per, (c + 1) * per);
-    if (part.length) TN.bullets(s, part, { x: MX + c * (colW + gap), y: y0, w: colW, h: TN.contentBottom() - y0, size });
+    const part = items.slice(c * per, (c + 1) * per);
+    if (part.length) TN.bullets(s, part, { x: MX + c * (colW + gap), y: top, w: colW, h: TN.contentBottom() - top, size, gap: sp });
   }
   chrome(s, p);
 }
@@ -130,7 +169,7 @@ bulletsSlide(p, {
 
 ## `features` — возможности строками
 
-![features](../examples/tn-life-strategy/preview/06-features.jpg)
+![features](../examples/tn-life-strategy/preview/07-features.jpg)
 
 Иконка в цветной плитке, заголовок, пояснение. Для сценариев и возможностей
 продукта, когда у каждого пункта есть своя иконка.
@@ -157,21 +196,26 @@ async function features(p, d) {
   const y0 = TN.header(s, d);
 
   const items = d.items.slice(0, 6);
-  const avail = TN.contentBottom() - y0;
-  const rowH = Math.max(104, Math.min(190, Math.floor(avail / items.length)));
-  const top = y0 + Math.max(0, (avail - rowH * items.length) / 2);
-  const tile = Math.min(88, rowH - 34);
+  const tileW = 76, tx = MX + tileW + 32, tw = CW - tileW - 32;
+
+  let rowH = 0;
+  for (const it of items) {
+    const tH = TN.blockH(it.title, tw, T.h4, true, 1.2);
+    const xH = it.text ? TN.blockH(it.text, tw, T.small, false, 1.4) + 10 : 0;
+    rowH = Math.max(rowH, tileW, tH + xH);
+  }
+  const { top, step } = TN.rows(y0, TN.contentBottom(), items.length, rowH, { min: 28, max: 96, bias: 0.36 });
 
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
     const a = TN.accent(d.mono ? 0 : i, it.tone);
-    const y = top + i * rowH;
-    TN.rect(s, p, { x: MX, y, w: tile, h: tile, fill: a.tint, r: 20 });
-    const ok = await TN.putIcon(s, it.icon, a.solid, { x: MX + tile * 0.24, y: y + tile * 0.24, w: tile * 0.52 });
-    if (!ok) TN.txt(s, TN.pad2(i + 1), { x: MX, y: y + tile / 2 - 20, w: tile, h: 40, size: 30, bold: true, color: a.solid, align: 'center' });
-    const tx = MX + tile + 28, tw = CW - tile - 28;
-    TN.txt(s, it.title, { x: tx, y: y + 2, w: tw, h: 42, size: T.h4, bold: true, lh: 1.15 });
-    if (it.text) TN.txt(s, it.text, { x: tx, y: y + 46, w: tw, h: rowH - 60, size: T.small, color: C.n60, lh: 1.4 });
+    const y = top + i * step;
+    const ok = await TN.tile(s, p, { x: MX, y, size: tileW, fill: a.tint, icon: it.icon, color: a.solid });
+    if (!ok) TN.txt(s, TN.pad2(i + 1), { x: MX, y: y + (tileW - 34) / 2, w: tileW, h: 36, size: T.h4, bold: true, color: a.solid, align: 'center' });
+
+    const tH = TN.blockH(it.title, tw, T.h4, true, 1.2);
+    TN.txt(s, it.title, { x: tx, y: y + 4, w: tw, h: tH + 6, size: T.h4, bold: true, lh: 1.2 });
+    if (it.text) TN.txt(s, it.text, { x: tx, y: y + tH + 14, w: tw, h: rowH - tH, size: T.small, color: C.muted, lh: 1.4 });
   }
   chrome(s, p);
 }
@@ -195,10 +239,11 @@ await features(p, {
 
 ## `cards` — карточки сеткой
 
-![cards](../examples/tn-life-strategy/preview/07-cards.jpg)
+![cards](../examples/tn-life-strategy/preview/08-cards.jpg)
 
-Равноправные блоки: модули, направления, команды. Высота карточки считается
-по самому длинному тексту в ряду, поэтому ряд всегда ровный.
+Равноправные блоки: модули, направления, команды. Карточка стоит на нейтральной
+подложке, цвет несёт иконка — так шесть карточек не превращаются в шесть цветных
+плашек. Высота считается по самому длинному тексту в ряду, поэтому ряд всегда ровный.
 
 До 8 карточек. Колонки подбираются сами: 2 карточки → 2 колонки, 3–4 → по числу
 карточек, больше → 3 колонки. `fill: 'solid'` заливает карточку акцентом целиком —
@@ -209,52 +254,59 @@ await features(p, {
 | `title` | заголовок слайда |
 | `lead` | лид |
 | `columns` | 2, 3 или 4 |
-| `mono` | `true` — все карточки в красном |
+| `mono` | `true` — все иконки в красном |
 | `items[].icon` | имя иконки |
 | `items[].title` | заголовок карточки |
 | `items[].text` | описание |
 | `items[].tone` | свой акцент |
-| `items[].fill` | `tint` (по умолчанию), `solid`, `plain` |
+| `items[].fill` | `plain` (по умолчанию), `tint`, `solid` |
 
 <details><summary>Сниппет</summary>
 
 ```js
 async function cards(p, d) {
   const s = p.addSlide();
-  s.background = { color: TN.hex(d.tone === 'light' ? C.surface : C.bg) };
+  const light = d.tone === 'light';
+  s.background = { color: TN.hex(light ? C.surface : C.bg) };
   const y0 = TN.header(s, d);
 
   const items = d.items.slice(0, 8);
   const cols = d.columns || (items.length <= 2 ? 2 : items.length <= 4 ? Math.min(items.length, 4) : 3);
-  const rows = Math.ceil(items.length / cols);
-  const gap = 32, pdx = 40, pdy = 36;
-  const cw = Math.floor((CW - gap * (cols - 1)) / cols);
-  const availH = TN.contentBottom() - y0;
+  const n = Math.ceil(items.length / cols);
+  const gap = 32, pdx = 36, pdy = 36, tileW = 64;
+  const cw = Math.floor((CW - gap * (cols - 1)) / cols), iw = cw - pdx * 2;
 
-  // высота карточки — по самому длинному контенту, чтобы ряд был ровным
+  // высота карточки — по самому длинному содержимому в деке карточек
   let need = 0;
   for (const it of items) {
-    const tH = TN.blockH(it.title, cw - pdx * 2, T.h3, true, 1.15);
-    const xH = it.text ? TN.blockH(it.text, cw - pdx * 2, T.small, false, 1.42) + 12 : 0;
-    need = Math.max(need, pdy * 2 + (it.icon ? 62 : 0) + tH + xH);
+    const tH = TN.blockH(it.title, iw, T.h3, true, 1.2);
+    const xH = it.text ? TN.blockH(it.text, iw, T.small, false, 1.45) + 12 : 0;
+    need = Math.max(need, pdy * 2 + (it.icon ? tileW + 20 : 0) + tH + xH);
   }
-  const slot = Math.floor((availH - gap * (rows - 1)) / rows);
-  const ch = Math.min(slot, Math.max(need, Math.round(slot * 0.72)));
+  const slot = Math.floor(((TN.contentBottom() - y0) - gap * (n - 1)) / n);
+  const ch = TN.boxH(need, slot, { grow: n === 1 ? 1.4 : 1.18 });
+  const top = TN.place(y0, TN.contentBottom(), ch * n + gap * (n - 1), 0.36);
 
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
     const a = TN.accent(d.mono ? 0 : i, it.tone);
     const x = MX + (i % cols) * (cw + gap);
-    const y = y0 + Math.floor(i / cols) * (ch + gap);
+    const y = top + Math.floor(i / cols) * (ch + gap);
     const solid = it.fill === 'solid';
-    TN.rect(s, p, { x, y, w: cw, h: ch, r: 28, fill: solid ? a.solid : it.fill === 'plain' ? C.n15 : a.tint });
+    TN.rect(s, p, { x, y, w: cw, h: ch, r: TN.R.card,
+      fill: solid ? a.solid : it.fill === 'tint' ? a.tint : light ? C.bg : C.surface });
 
     let cy = y + pdy;
-    if (it.icon && await TN.putIcon(s, it.icon, solid ? C.onAccent : a.solid, { x: x + pdx, y: cy, w: 44 })) cy += 62;
-    const tH = TN.blockH(it.title, cw - pdx * 2, T.h3, true, 1.15);
-    TN.txt(s, it.title, { x: x + pdx, y: cy, w: cw - pdx * 2, h: tH + 6, size: T.h3, bold: true, lh: 1.15, color: solid ? C.onAccent : C.ink });
-    cy += tH + 10;
-    if (it.text) TN.txt(s, it.text, { x: x + pdx, y: cy, w: cw - pdx * 2, h: Math.max(30, y + ch - pdy - cy), size: T.small, lh: 1.42, color: solid ? C.onRedDim : C.n60 });
+    if (it.icon) {
+      const ok = await TN.tile(s, p, { x: x + pdx, y: cy, size: tileW, r: TN.R.tile,
+        fill: solid ? a.deep : light ? C.surface : C.bg, icon: it.icon, color: solid ? C.onAccent : a.solid });
+      if (ok) cy += tileW + 20;
+    }
+    const tH = TN.blockH(it.title, iw, T.h3, true, 1.2);
+    TN.txt(s, it.title, { x: x + pdx, y: cy, w: iw, h: tH + 6, size: T.h3, bold: true, lh: 1.2, color: solid ? C.onAccent : C.ink });
+    cy += tH + 12;
+    if (it.text) TN.txt(s, it.text, { x: x + pdx, y: cy, w: iw, h: Math.max(30, y + ch - pdy - cy), size: T.small, lh: 1.45,
+      color: solid ? C.onAccentDim : C.muted });
   }
   chrome(s, p);
 }
@@ -280,10 +332,11 @@ await cards(p, {
 
 ## `quote` — цитата
 
-![quote](../examples/tn-life-strategy/preview/16-quote.jpg)
+![quote](../examples/tn-life-strategy/preview/28-quote.jpg)
 
 Слова реального человека: пользователя, заказчика, руководителя. Работает
-там, где цифры уже показаны и нужен живой голос.
+там, где цифры уже показаны и нужен живой голос. Слева — акцентная черта во всю
+высоту цитаты, она держит блок на странице.
 
 До 200 знаков. Цитата дословная — не сокращай и не причёсывай. Должность обязательна:
 без неё непонятно, почему этому человеку верить.
@@ -302,24 +355,26 @@ await cards(p, {
 function quote(p, d) {
   const s = p.addSlide();
   s.background = { color: TN.hex(d.tone === 'light' ? C.surface : C.bg) };
-  const w = 1440, x = (W - w) / 2;
 
-  const ft = TN.fit(d.text, { w: w - 40, h: 420, size: T.quote, min: 38, bold: true, lh: 1.25 });
-  const th = ft.lines * ft.size * 1.25;
-  let y = Math.max(230, (H - th - (d.author ? 120 : 0) - 150) / 2 + 150);
+  const rule = 6, tx = MX + 56, tw = 1280;
+  const ft = TN.fit(d.text, { w: tw, h: 440, size: T.quote, min: 36, bold: true, lh: 1.28 });
+  const th = ft.lines * ft.size * 1.28;
+  const authH = d.author ? (d.role ? 84 : 44) : 0;
+  const need = th + (authH ? 56 + authH : 0);
+  let y = TN.place(MT + 40, TN.contentBottom(), need, 0.44);
 
-  TN.txt(s, '“', { x: x + 12, y: y - 190, w: 300, h: 220, size: 220, bold: true, color: C.red15, lh: 1 });
-  TN.txt(s, d.text, { x: x + 20, y, w: w - 40, h: th + 10, size: ft.size, bold: true, lh: 1.25 });
+  TN.rect(s, p, { x: MX, y: y + 6, w: rule, h: th - 8, fill: C.accent });
+  TN.txt(s, d.text, { x: tx, y, w: tw, h: th + 10, size: ft.size, bold: true, lh: 1.28, color: C.ink });
   y += th + 56;
 
   if (d.author) {
-    let tx = x + 20;
+    let ax = tx;
     if (d.avatar && TN.assetPath(d.avatar)) {
-      s.addImage({ path: TN.assetPath(d.avatar), x: px(tx), y: px(y - 6), w: px(88), h: px(88), sizing: { type: 'cover', w: px(88), h: px(88) }, rounding: true });
-      tx += 112;
+      s.addImage({ path: TN.assetPath(d.avatar), x: px(ax), y: px(y - 8), w: px(84), h: px(84), sizing: { type: 'cover', w: px(84), h: px(84) }, rounding: true });
+      ax += 108;
     }
-    TN.txt(s, d.author, { x: tx, y, w: 900, h: 42, size: 30, bold: true });
-    if (d.role) TN.txt(s, d.role, { x: tx, y: y + 44, w: 900, h: 38, size: 25, color: C.n60 });
+    TN.txt(s, d.author, { x: ax, y, w: 900, h: 40, size: T.h4, bold: true });
+    if (d.role) TN.txt(s, d.role, { x: ax, y: y + 42, w: 900, h: 36, size: T.small, color: C.muted });
   }
   chrome(s, p);
 }
@@ -333,5 +388,96 @@ quote(p, {
     text: 'Раньше заявку на пропуск я нёс в другой корпус. Теперь это два тапа в телефоне прямо из цеха.',
     author: 'Алексей Ремизов',
     role: 'Мастер смены, завод в Рязани',
+  });
+```
+
+## `takeaways` — выводы
+
+![takeaways](../examples/tn-life-strategy/preview/21-takeaways.jpg)
+
+Главный вывод крупно и рядом — из чего он сложился. Ставится после блока
+доказательств: цифры уже показаны, здесь их смысл.
+
+Вывод — одно предложение до 140 знаков. Колонок две–четыре, и они не равны
+друг другу по смыслу: «что сработало», «что недооценили», «что делаем дальше».
+Надзаголовок колонки называет роль, а не повторяет заголовок.
+
+| Поле | Значение |
+|---|---|
+| `title` | заголовок слайда |
+| `lead` | лид |
+| `text` | сам вывод, до 140 знаков |
+| `items[].label` | надзаголовок колонки |
+| `items[].title` | утверждение |
+| `items[].text` | пояснение |
+| `items[].tone` | свой акцент |
+
+<details><summary>Сниппет</summary>
+
+```js
+function takeaways(p, d) {
+  const s = p.addSlide();
+  s.background = { color: TN.hex(C.bg) };
+  const y0 = TN.header(s, d);
+  const bottom = TN.contentBottom();
+
+  const items = d.items.slice(0, 4);
+  const gap = 32, pd = 32, rule = 6;
+  const cw = Math.floor((CW - gap * (items.length - 1)) / items.length);
+  const iw = cw - pd * 2 - rule;
+
+  const tw = CW - 56;
+  const ft = TN.fit(d.text, { w: tw, h: 280, size: T.h3 + 10, min: 32, bold: true, lh: 1.25 });
+  const th = ft.lines * ft.size * 1.25;
+
+  let need = 0;
+  for (const it of items) {
+    const eH = it.label ? 38 : 0;
+    const tH = TN.blockH(it.title, iw, T.h4, true, 1.2);
+    const xH = it.text ? TN.blockH(it.text, iw, T.small, false, 1.4) + 12 : 0;
+    need = Math.max(need, pd * 2 + eH + tH + xH);
+  }
+  const ch = TN.boxH(need, bottom - y0 - th - 64, { grow: 1.08 });
+  const top = TN.place(y0, bottom, th + 64 + ch, 0.36);
+
+  TN.rect(s, p, { x: MX, y: top + 4, w: rule, h: th - 6, fill: C.accent });
+  TN.txt(s, d.text, { x: MX + 56, y: top, w: tw, h: th + 10, size: ft.size, bold: true, lh: 1.25 });
+
+  const cy = top + th + 64;
+  items.forEach((it, i) => {
+    const a = TN.accent(i, it.tone);
+    const x = MX + i * (cw + gap);
+    TN.rect(s, p, { x, y: cy, w: cw, h: ch, r: TN.R.card, fill: a.tint });
+    TN.rect(s, p, { x, y: cy, w: rule, h: ch, fill: a.solid });
+
+    let iy = cy + pd;
+    if (it.label) {
+      TN.txt(s, String(it.label).toUpperCase(), { x: x + pd + rule, y: iy, w: iw, h: 30, size: T.eyebrow, bold: true,
+        spacing: 2.4, color: a.solid, font: TN.MONO || TN.FONT });
+      iy += 38;
+    }
+    const tH = TN.blockH(it.title, iw, T.h4, true, 1.2);
+    TN.txt(s, it.title, { x: x + pd + rule, y: iy, w: iw, h: tH + 6, size: T.h4, bold: true, lh: 1.2 });
+    if (it.text) TN.txt(s, it.text, { x: x + pd + rule, y: iy + tH + 12, w: iw, h: ch - (iy - cy) - tH - pd, size: T.small, lh: 1.4, color: a.deep });
+  });
+  chrome(s, p);
+}
+```
+</details>
+
+Пример вызова:
+
+```js
+takeaways(p, {
+    title: 'Ключевые выводы',
+    text: 'Пилот подтвердил главное: людям нужен не ещё один инструмент, а одно место, где рабочий день уже собран за них.',
+    items: [
+      { label: 'Что сработало', tone: 'green', title: 'Мобильный вход с первого дня',
+        text: '58 % сессий со смены — без него платформа осталась бы офисной.' },
+      { label: 'Что недооценили', tone: 'orange', title: 'Обучение бригадиров',
+        text: 'Первый месяц ушёл на людей, а не на технику. Закладываем это в план.' },
+      { label: 'Вывод', tone: 'blue', title: 'Масштабируем без переделок',
+        text: 'Архитектура и дизайн-система выдержали пилот — меняем только скорость.' },
+    ],
   });
 ```
