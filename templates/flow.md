@@ -28,7 +28,7 @@
 ```js
 function process(p, d) {
   const s = p.addSlide();
-  s.background = { color: TN.hex(d.tone === 'light' ? C.n15 : C.white) };
+  s.background = { color: TN.hex(d.tone === 'light' ? C.surface : C.bg) };
   const y0 = TN.header(s, d);
 
   const steps = d.steps.slice(0, 6);
@@ -47,9 +47,9 @@ function process(p, d) {
   steps.forEach((it, i) => {
     const a = TN.accent(i, it.tone);
     const x = MX + i * (cw + gap);
-    TN.rect(s, p, { x, y: y0, w: cw, h: chH, r: 28, fill: C.n15 });
+    TN.rect(s, p, { x, y: y0, w: cw, h: chH, r: 28, fill: C.surface });
     TN.ellipse(s, p, { x: x + pd, y: y0 + pd, w: 76, h: 76, fill: a.solid });
-    TN.txt(s, TN.pad2(i + 1), { x: x + pd, y: y0 + pd + 18, w: 76, h: 44, size: 32, bold: true, color: C.white, align: 'center' });
+    TN.txt(s, TN.pad2(i + 1), { x: x + pd, y: y0 + pd + 18, w: 76, h: 44, size: 32, bold: true, color: C.onAccent, align: 'center' });
 
     let cy = y0 + pd + 106;
     const tH = TN.blockH(it.title, cw - pd * 2, T.h4, true, 1.15);
@@ -110,7 +110,7 @@ process(p, {
 ```js
 function timeline(p, d) {
   const s = p.addSlide();
-  s.background = { color: TN.hex(C.white) };
+  s.background = { color: TN.hex(C.bg) };
   const y0 = TN.header(s, d);
 
   const labelW = d.labelW || 460;
@@ -135,7 +135,7 @@ function timeline(p, d) {
       const bh = Math.min(52, rowH - 26);
       const tint = b.fill === 'tint';
       TN.rect(s, p, { x: bx, y: y + (rowH - bh) / 2, w: bw, h: bh, r: bh / 2, fill: tint ? a.tint : a.solid });
-      if (b.label) TN.txt(s, b.label, { x: bx + 20, y: y + (rowH - bh) / 2 + (bh - 28) / 2, w: bw - 40, h: 30, size: 21, bold: true, color: tint ? a.deep : C.white });
+      if (b.label) TN.txt(s, b.label, { x: bx + 20, y: y + (rowH - bh) / 2 + (bh - 28) / 2, w: bw - 40, h: 30, size: 21, bold: true, color: tint ? a.deep : C.onAccent });
     });
     if (i < d.rows.length - 1) TN.hline(s, p, { x: MX, y: y + rowH, w: CW, width: 1 });
   });
@@ -187,7 +187,7 @@ timeline(p, {
 ```js
 function compare(p, d) {
   const s = p.addSlide();
-  s.background = { color: TN.hex(d.tone === 'light' ? C.n15 : C.white) };
+  s.background = { color: TN.hex(d.tone === 'light' ? C.surface : C.bg) };
   const y0 = TN.header(s, d);
 
   const cols = d.columns.slice(0, 4);
@@ -203,7 +203,7 @@ function compare(p, d) {
     // шапка колонки: скруглённый прямоугольник + прямоугольник-«подбородок»
     TN.rect(s, p, { x, y: y0, w: cw, h: 116, r: 28, fill: hi ? a.solid : C.n20 });
     TN.rect(s, p, { x, y: y0 + 88, w: cw, h: 28, fill: hi ? a.solid : C.n20 });
-    TN.txt(s, col.title, { x: x + 32, y: y0 + 24, w: cw - 64, h: 44, size: T.h4, bold: true, align: 'center', color: hi ? C.white : C.n100 });
+    TN.txt(s, col.title, { x: x + 32, y: y0 + 24, w: cw - 64, h: 44, size: T.h4, bold: true, align: 'center', color: hi ? C.onAccent : C.ink });
     if (col.subtitle) TN.txt(s, col.subtitle, { x: x + 32, y: y0 + 68, w: cw - 64, h: 34, size: 22, align: 'center', color: hi ? C.onRedMeta : C.n60 });
     TN.bullets(s, col.items, { x: x + 36, y: y0 + 150, w: cw - 72, h: chH - 180, size: T.small, lh: 1.42, gap: 14, bullet: a.solid });
   });

@@ -8,6 +8,11 @@
  * Вставь этот файл в начало своего скрипта сборки (или `require` его),
  * дальше пиши слайды сниппетами из шаблонов.
  *
+ * Оформление задаётся темой (`templates/_themes.js`): тема меняет значения
+ * токенов, шрифт и обложку, геометрия макетов остаётся прежней.
+ *   const p = TN.newDeck({ title: 'Дека', theme: 'digital' });
+ *   await TN.prepare();   // фоновая графика темы, если она есть
+ *
  * Зависимости: pptxgenjs (обязательно), sharp (только для иконок и белого логотипа).
  */
 'use strict';
@@ -15,6 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 const PptxGenJS = require('pptxgenjs');
+const { THEMES } = require('./_themes');
 let sharp = null;
 try { sharp = require('sharp'); } catch (_) {}
 
@@ -32,57 +38,77 @@ const CW = W - MX * 2;         // 1744 — ширина колонки конт�
 const FOOTER_H = 60;           // зона колонтитула снизу
 
 function newDeck(meta = {}) {
+  if (meta.theme) useTheme(meta.theme);
   const p = new PptxGenJS();
   p.defineLayout({ name: 'TN16x9', width: W / 144, height: H / 144 });
   p.layout = 'TN16x9';
   p.author = meta.author || 'ТЕХНОНИКОЛЬ';
   p.company = 'ТЕХНОНИКОЛЬ';
   p.title = meta.title || 'Презентация';
+
+  // Фон слайда по теме — чтобы в тёмной теме не осталось белых слайдов там,
+  // где сниппет фон не задаёт. Сниппет всегда может переопределить его сам.
+  const add = p.addSlide.bind(p);
+  p.addSlide = (...a) => {
+    const s = add(...a);
+    s.background = { color: hex(C.bg) };
+    return s;
+  };
   return p;
 }
 
-// ── Токены цвета (tokens/colors.css) ─────────────────────────────────────
-const C = {
-  white: '#ffffff',
-  n10: '#f9f9fa', n15: '#f3f5f7', n20: '#e6e8ed', n30: '#c8ccd6',
-  n40: '#abb0c1', n50: '#8890a7', n60: '#667387', n65: '#4e5867', n100: '#1e2228',
-  red10: '#fdedee', red15: '#fbdbdd', red35: '#f49fa5', red60: '#e11b11', red65: '#ae1603',
-  blue10: '#e6f2ff', blue60: '#006ee4', blue65: '#0055af',
-  green10: '#dff6e8', green50: '#00a73b', green65: '#006624',
-  orange10: '#ffeedc', orange45: '#f37e00', orange65: '#7e4b21',
-  purple10: '#f3effd', purple60: '#7e62ba', purple65: '#604b8f',
-  yellow10: '#fdf3ac', yellow50: '#b18b2b', yellow65: '#5f5819',
-  // на красном фоне
-  onRedDim: '#ffe4e2', onRedEyebrow: '#f9cccf', onRedMeta: '#ffd7d4',
-};
+// ── Тема ─────────────────────────────────────────────────────────────────
+// Значения токенов живут в теме. `C`, `ACCENTS` и `T` — те же объекты на всём
+// протяжении сборки: useTheme() переписывает их содержимое, а не подменяет
+// ссылку, поэтому деструктуризация `const { C, T } = TN` продолжает работать.
 
-/** Акценты по порядку. Первый — фирменный красный. */
-const ACCENTS = [
-  { key: 'red',    solid: C.red60,    tint: C.red10,    deep: C.red65 },
-  { key: 'blue',   solid: C.blue60,   tint: C.blue10,   deep: C.blue65 },
-  { key: 'green',  solid: C.green50,  tint: C.green10,  deep: C.green65 },
-  { key: 'orange', solid: C.orange45, tint: C.orange10, deep: C.orange65 },
-  { key: 'purple', solid: C.purple60, tint: C.purple10, deep: C.purple65 },
-  { key: 'yellow', solid: C.yellow50, tint: C.yellow10, deep: C.yellow65 },
-];
-const accent = (i, name) => ACCENTS.find((a) => a.key === name) || ACCENTS[(i || 0) % ACCENTS.length];
+let ACTIVE = THEMES.brand;
+const _art = new Map();        // сгенерированная графика темы: свечение, полоса, знак
 
-// ── Типографика деки (крупнее UI-шкалы; px по макету 1920×1080) ──────────
-const FONT = 'Inter';          // нет Inter у получателей → 'Arial'
-const T = {
-  display: 120,   // титул
-  h1: 108,        // разделитель
-  h2: 68,         // заголовок контентного слайда
-  h3: 36,         // заголовок карточки
-  h4: 30,         // заголовок строки
-  lead: 32,       // лид-абзац под заголовком
-  body: 28,
-  small: 24,      // подписи в карточках
-  caption: 22,    // колонтитул и сноски
-  eyebrow: 28,    // надзаголовок капсом
-  metric: 112,    // большая цифра
-  quote: 60,
-};
+/** Токены цвета активной темы. Имя токена — роль, а не цвет (см. _themes.js). */
+const C = Object.assign({}, ACTIVE.colors);
+
+/** Акценты активной темы. Первый — основной. */
+const ACCENTS = ACTIVE.accents.map((a) => Object.assign({}, a));
+/**
+ * Акцент по индексу элемента или по имени. Имена `green` и `red` — семантика
+ * «лучше / хуже»: в темах, где таких акцентов нет, они берутся из `semantic`,
+ * иначе положительная динамика красилась бы случайным цветом.
+ */
+const accent = (i, name) => (name && (ACCENTS.find((a) => a.key === name) || (ACTIVE.semantic || {})[name]))
+  || ACCENTS[(i || 0) % ACCENTS.length];
+
+/** Шкала кеглей активной темы (px по макету 1920×1080). */
+const T = Object.assign({}, ACTIVE.type);
+
+let FONT = ACTIVE.font;        // нет шрифта у получателей → замени на 'Arial'
+let MONO = ACTIVE.mono;        // моноширинный для надзаголовков, может быть null
+
+/** Активная тема целиком: имя, обложка, полоса, флаг тёмной. */
+const theme = () => ACTIVE;
+
+/**
+ * Переключает тему. Вызывается до первого слайда — обычно через
+ * `TN.newDeck({ theme: 'digital' })`.
+ */
+function useTheme(key) {
+  const th = key && typeof key === 'object' ? key : THEMES[key];
+  if (!th) {
+    console.warn(`  ! нет темы «${key}»; доступны: ${Object.keys(THEMES).join(', ')}`);
+    return ACTIVE;
+  }
+  ACTIVE = th;
+  for (const k of Object.keys(C)) delete C[k];
+  Object.assign(C, th.colors);
+  ACCENTS.length = 0;
+  for (const a of th.accents) ACCENTS.push(Object.assign({}, a));
+  for (const k of Object.keys(T)) delete T[k];
+  Object.assign(T, th.type);
+  FONT = th.font;
+  MONO = th.mono;
+  _art.clear();
+  return th;
+}
 
 const hex = (c) => String(c || '').replace('#', '').toUpperCase();
 const NOLINE = { width: 0, color: 'FFFFFF', transparency: 100 };
@@ -132,7 +158,7 @@ function txt(s, body, o) {
     text: r.text,
     options: {
       bold: r.bold != null ? r.bold : !!o.bold,
-      color: hex(r.color || o.color || C.n100),
+      color: hex(r.color || o.color || C.ink),
       fontSize: pt(r.size || o.size),
       italic: !!r.italic,
     },
@@ -140,7 +166,7 @@ function txt(s, body, o) {
     x: px(o.x), y: px(o.y), w: px(o.w), h: px(o.h),
     isTextBox: true, margin: 0,
     fontFace: o.font || FONT, fontSize: pt(o.size),
-    color: hex(o.color || C.n100), bold: !!o.bold,
+    color: hex(o.color || C.ink), bold: !!o.bold,
     align: o.align || 'left', valign: o.valign || 'top',
     lineSpacing: pt(o.size * (o.lh || 1.25)),
     charSpacing: o.spacing,
@@ -167,7 +193,7 @@ function ellipse(s, p, o) {
 }
 
 function hline(s, p, o) {
-  s.addShape(p.ShapeType.line, { x: px(o.x), y: px(o.y), w: px(o.w), h: 0, line: { color: hex(o.color || C.n20), width: o.width || 2 } });
+  s.addShape(p.ShapeType.line, { x: px(o.x), y: px(o.y), w: px(o.w), h: 0, line: { color: hex(o.color || C.line), width: o.width || 2 } });
 }
 
 /**
@@ -184,8 +210,8 @@ function bullets(s, items, o) {
     return parts.map((p2, j) => ({
       text: p2.t,
       options: {
-        bold: p2.b, color: hex(o.color || C.n100), fontSize: pt(size),
-        bullet: j === 0 ? { code: '2022', color: hex(o.bullet || C.red60) } : false,
+        bold: p2.b, color: hex(o.color || C.ink), fontSize: pt(size),
+        bullet: j === 0 ? { code: '2022', color: hex(o.bullet || C.accent) } : false,
         breakLine: j === parts.length - 1 && i < items.length - 1,
         paraSpaceAfter: j === parts.length - 1 ? pt(o.gap == null ? 16 : o.gap) : undefined,
       },
@@ -194,20 +220,21 @@ function bullets(s, items, o) {
   s.addText(runs, {
     x: px(o.x), y: px(o.y), w: px(o.w), h: px(o.h),
     isTextBox: true, margin: 0, fontFace: o.font || FONT, fontSize: pt(size),
-    color: hex(o.color || C.n100), lineSpacing: pt(size * (o.lh || 1.4)), valign: 'top',
+    color: hex(o.color || C.ink), lineSpacing: pt(size * (o.lh || 1.4)), valign: 'top',
   });
 }
 
 /** Колонтитул контентного слайда: подпись слева, номер страницы справа. */
 function footer(s, p, { label, no, total, rule = false }) {
+  edgeBar(s, p);
   const y = H - MB - 30;
   if (rule) hline(s, p, { x: MX, y: y - 26, w: CW, color: C.n20, width: 2 });
-  if (label) txt(s, label, { x: MX, y, w: CW - 320, h: 34, size: T.caption, color: C.n50 });
+  if (label) txt(s, label, { x: MX, y, w: CW - 320, h: 34, size: T.caption, color: C.soft, font: MONO || FONT });
   if (no) {
     s.addText([
-      { text: pad2(no), options: { bold: true, color: hex(C.n100), fontSize: pt(T.caption) } },
-      { text: ` / ${total}`, options: { color: hex(C.n40), fontSize: pt(T.caption) } },
-    ], { x: px(MX + CW - 320), y: px(y), w: px(320), h: px(34), isTextBox: true, margin: 0, align: 'right', fontFace: FONT });
+      { text: pad2(no), options: { bold: true, color: hex(C.ink), fontSize: pt(T.caption) } },
+      { text: ` / ${total}`, options: { color: hex(C.faint), fontSize: pt(T.caption) } },
+    ], { x: px(MX + CW - 320), y: px(y), w: px(320), h: px(34), isTextBox: true, margin: 0, align: 'right', fontFace: MONO || FONT });
   }
 }
 
@@ -218,23 +245,24 @@ const contentBottom = (hasFooter = true) => H - MB - (hasFooter ? FOOTER_H : 0);
  * Шапка контентного слайда: надзаголовок, заголовок, лид.
  * Возвращает Y, с которого начинается контент.
  */
-function header(s, { eyebrow, title, lead, accentColor = C.red60, w = CW, maxH = 200 }) {
+function header(s, { eyebrow, title, lead, accentColor, w = CW, maxH = 200 }) {
+  accentColor = accentColor || C.accent;
   let y = MT;
   if (eyebrow) {
-    txt(s, String(eyebrow).toUpperCase(), { x: MX, y, w, h: 34, size: T.eyebrow, bold: true, color: accentColor, spacing: 2 });
+    txt(s, String(eyebrow).toUpperCase(), { x: MX, y, w, h: 34, size: T.eyebrow, bold: true, color: accentColor, spacing: 2, font: MONO || FONT });
     y += 46;
   }
   if (title) {
     const f = fit(title, { w, h: maxH, size: T.h2, min: 40, bold: true, lh: 1.08 });
     const h = f.lines * f.size * 1.08;
-    txt(s, title, { x: MX, y, w, h: h + 8, size: f.size, bold: true, color: C.n100, lh: 1.08 });
+    txt(s, title, { x: MX, y, w, h: h + 8, size: f.size, bold: true, color: C.ink, lh: 1.08 });
     y += h + (lead ? 20 : 40);
   }
   if (lead) {
     const lw = Math.min(w, 1360);
     const f = fit(lead, { w: lw, h: 140, size: T.lead, min: 24, lh: 1.4 });
     const h = f.lines * f.size * 1.4;
-    txt(s, lead, { x: MX, y, w: lw, h: h + 6, size: f.size, color: C.n60, lh: 1.4 });
+    txt(s, lead, { x: MX, y, w: lw, h: h + 6, size: f.size, color: C.muted, lh: 1.4 });
     y += h + 44;
   }
   return y;
@@ -301,7 +329,7 @@ function picture(s, p, o) {
     return true;
   }
   const rose = o.tone === 'rose';
-  const bg = rose ? '#fdf1f1' : C.n15, bd = rose ? C.red35 : C.n30, fg = rose ? '#c86a70' : C.n50;
+  const bg = rose ? C.accentTint : C.surface, bd = rose ? C.red35 : C.lineStrong, fg = rose ? C.red35 : C.soft;
   rect(s, p, { x: o.x, y: o.y, w: o.w, h: o.h, fill: bg, r: o.r == null ? 32 : o.r, line: { color: bd, width: 2, dash: 'dash' } });
   const note = o.note || `вставьте ${Math.round(o.w)}×${Math.round(o.h)}`;
   txt(s, 'Изображение', { x: o.x + 20, y: o.y + o.h / 2 - 40, w: o.w - 40, h: 40, size: 30, bold: true, color: fg, align: 'center' });
@@ -309,10 +337,124 @@ function picture(s, p, o) {
   return false;
 }
 
+
+// ── Графика темы ─────────────────────────────────────────────────────────
+// Тёмные темы держатся на свечении и градиенте, а в PPTX градиентной заливки
+// нет. Поэтому фоновые слои рисуются один раз в PNG (через sharp) и ставятся
+// картинкой. Нет sharp — слои просто не рисуются, дека собирается без них.
+
+async function _png(svg, key) {
+  if (!sharp) return null;
+  if (key && _art.has(key)) return _art.get(key);
+  let out = null;
+  try { out = 'image/png;base64,' + (await sharp(Buffer.from(svg)).png().toBuffer()).toString('base64'); }
+  catch (_) {}
+  if (key) _art.set(key, out);
+  return out;
+}
+
+/** Слой свечения на всю плашку: радиальные пятна темы по прозрачному фону. */
+async function glowLayer() {
+  const g = ACTIVE.cover && ACTIVE.cover.glow;
+  if (!g || !g.length) return null;
+  const w = 960, h = 540;   // половина макета: пятна размытые, деталей нет
+  const defs = g.map((it, i) => `<radialGradient id="g${i}" cx="${it.x * 100}%" cy="${it.y * 100}%" r="${it.r * 100}%">` +
+    `<stop offset="0" stop-color="${it.color}" stop-opacity="${it.alpha}"/>` +
+    `<stop offset="1" stop-color="${it.color}" stop-opacity="0"/></radialGradient>`).join('');
+  const rects = g.map((_, i) => `<rect width="${w}" height="${h}" fill="url(#g${i})"/>`).join('');
+  return _png(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
+    `<defs>${defs}</defs>${rects}</svg>`, `glow|${ACTIVE.key}`);
+}
+
+/** Полоса-градиент по нижнему краю слайда. */
+async function barImage() {
+  const b = ACTIVE.bar;
+  if (!b) return null;
+  const w = 960, h = Math.max(2, b.h);
+  const stops = b.stops.map((c, i) => `<stop offset="${(i / (b.stops.length - 1) * 100).toFixed(0)}%" stop-color="${c}"/>`).join('');
+  return _png(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
+    `<defs><linearGradient id="b" x1="0" y1="0" x2="${w}" y2="0" gradientUnits="userSpaceOnUse">${stops}</linearGradient></defs>` +
+    `<rect width="${w}" height="${h}" fill="url(#b)"/></svg>`, `bar|${ACTIVE.key}`);
+}
+
+/** Знак темы: шестиугольник-сеть TN Digital. */
+async function markImage(side) {
+  if (!side) side = typeof (ACTIVE.cover || {}).mark === 'number' ? ACTIVE.cover.mark : 760;
+  const b = ACTIVE.bar;
+  if (!(ACTIVE.cover && ACTIVE.cover.mark) || !b) return null;
+  const stops = b.stops.map((c, i) => `<stop offset="${(i / (b.stops.length - 1) * 100).toFixed(0)}%" stop-color="${c}"/>`).join('');
+  const nodes = [[50, 8], [88, 29], [88, 71], [50, 92], [12, 71], [12, 29]]
+    .map(([cx, cy]) => `<circle cx="${cx}" cy="${cy}" r="4.4" fill="${ACTIVE.colors.bg}" stroke="url(#m)" stroke-width="0.9"/>`).join('');
+  return _png(`<svg xmlns="http://www.w3.org/2000/svg" width="${side}" height="${side}" viewBox="-6 -6 112 112">` +
+    `<defs><linearGradient id="m" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">${stops}</linearGradient></defs>` +
+    `<g fill="none" stroke="url(#m)" stroke-width="0.7" stroke-linejoin="round">` +
+    `<path d="M50 8 L88 29 L88 71 L50 92 L12 71 L12 29 Z"/><path d="M50 50 L50 8 M50 50 L88 71 M50 50 L12 71"/></g>` +
+    `${nodes}<circle cx="50" cy="50" r="4.6" fill="url(#m)"/></svg>`, `mark|${ACTIVE.key}|${side}`);
+}
+
+/**
+ * Готовит графику темы до сборки слайдов. Вызывай сразу после newDeck():
+ * без этого колонтитул нарисует полосу сплошным цветом вместо градиента.
+ */
+async function prepare() {
+  await Promise.all([glowLayer(), barImage(), markImage()]);
+  return ACTIVE;
+}
+
+/** Полоса темы по нижнему краю. Ставится колонтитулом на каждый слайд. */
+function edgeBar(s, p) {
+  const b = ACTIVE.bar;
+  if (!b) return false;
+  const img = _art.get(`bar|${ACTIVE.key}`);
+  if (img) s.addImage({ data: img, x: 0, y: px(H - b.h), w: px(W), h: px(b.h) });
+  else rect(s, p, { x: 0, y: H - b.h, w: W, h: b.h, fill: b.stops[0] });
+  return true;
+}
+
+/**
+ * Фон обложки (титул и финал) по активной теме.
+ *   'accent' — заливка акцентом во всю плашку, с паттерном или без;
+ *   'ink'    — тёмный фон со свечением, знаком и полосой.
+ * accentColor — заливка под конкретное подразделение (тема `division`).
+ */
+async function coverBg(s, p, d = {}) {
+  const cv = ACTIVE.cover || {};
+  if (cv.kind === 'ink') {
+    s.background = { color: hex(C.bg) };
+    const glow = await glowLayer();
+    if (glow) s.addImage({ data: glow, x: 0, y: 0, w: px(W), h: px(H) });
+    if (cv.mark) {
+      const side = typeof cv.mark === 'number' ? cv.mark : 760;
+      const mk = await markImage(side);
+      if (mk) s.addImage({ data: mk, x: px(W - side - 110), y: px((H - side) / 2), w: px(side), h: px(side) });
+    }
+    edgeBar(s, p);
+    return 'ink';
+  }
+  const fill = d.accentColor || C.accent;
+  s.background = { color: hex(fill) };
+  if (cv.pattern === 'circle') ellipse(s, p, { x: 1240, y: -220, w: 900, h: 900, fill: C.accentDeep, transparency: 65 });
+  edgeBar(s, p);
+  return 'accent';
+}
+
+/** Цвета текста на обложке активной темы. */
+const coverInk = () => ({
+  title: C.onCoverInk, lead: C.onCoverDim,
+  eyebrow: C.onCoverEyebrow, meta: C.onCoverMeta,
+});
+
 module.exports = {
   W, H, px, pt, MX, MT, MB, CW, FOOTER_H, newDeck,
-  C, ACCENTS, accent, FONT, T, hex, NOLINE, pad2,
+  C, ACCENTS, accent, T, hex, NOLINE, pad2,
+  THEMES, theme, useTheme, prepare, coverBg, coverInk, edgeBar,
+  glowLayer, barImage, markImage,
   lines, fit, blockH, txt, rect, ellipse, hline, bullets,
   footer, contentBottom, header,
   assetPath, icon, putIcon, logo, picture,
 };
+
+// FONT и MONO меняются вместе с темой, поэтому экспортируются геттерами:
+// обычное поле замёрзло бы на значении темы, активной в момент загрузки.
+Object.defineProperty(module.exports, 'FONT', { enumerable: true, get: () => FONT });
+Object.defineProperty(module.exports, 'MONO', { enumerable: true, get: () => MONO });

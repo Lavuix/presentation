@@ -34,13 +34,13 @@
 ```js
 async function split(p, d) {
   const s = p.addSlide();
-  s.background = { color: TN.hex(C.white) };
+  s.background = { color: TN.hex(C.bg) };
   const artRight = (d.side || 'right') === 'right';
   const artW = Math.round(W * (d.ratio || 0.46));
   const txW = W - artW;
   const ax = artRight ? txW : 0;
 
-  TN.rect(s, p, { x: ax, y: 0, w: artW, h: H, fill: C.n15 });
+  TN.rect(s, p, { x: ax, y: 0, w: artW, h: H, fill: C.surface });
   TN.picture(s, p, { x: ax + 64, y: 72, w: artW - 128, h: H - 144, image: d.image, note: d.imageNote, r: 32 });
 
   const tx = artRight ? MX : artW + 64;
@@ -112,7 +112,7 @@ await split(p, {
 ```js
 function image(p, d) {
   const s = p.addSlide();
-  s.background = { color: TN.hex(d.tone === 'light' ? C.n15 : C.white) };
+  s.background = { color: TN.hex(d.tone === 'light' ? C.surface : C.bg) };
   const y0 = TN.header(s, { ...d, maxH: 90 });
   const bottom = TN.contentBottom();
   const avail = bottom - y0;
@@ -120,14 +120,14 @@ function image(p, d) {
   if (d.frame === 'laptop') {
     const lw = 1024, sw = 984, sh = Math.min(639, avail - 80);
     const x = (W - lw) / 2;
-    TN.rect(s, p, { x, y: y0, w: lw, h: sh + 42, r: 22, fill: C.n100 });
+    TN.rect(s, p, { x, y: y0, w: lw, h: sh + 42, r: 22, fill: C.frame });
     TN.ellipse(s, p, { x: W / 2 - 4, y: y0 + 12, w: 8, h: 8, fill: '#4d5666' });
     TN.picture(s, p, { x: x + 20, y: y0 + 28, w: sw, h: sh, image: d.image, tone: 'rose', r: 4, note: d.imageNote });
     TN.rect(s, p, { x: (W - 1160) / 2, y: y0 + sh + 42, w: 1160, h: 26, r: 8, fill: C.n30 });
   } else if (d.frame === 'phone') {
     const ph = Math.min(858, avail), pw = Math.round(ph * 0.48);
     const x = (W - pw) / 2;
-    TN.rect(s, p, { x, y: y0, w: pw, h: ph, r: 58, fill: C.n100 });
+    TN.rect(s, p, { x, y: y0, w: pw, h: ph, r: 58, fill: C.frame });
     TN.picture(s, p, { x: x + 16, y: y0 + 16, w: pw - 32, h: ph - 32, image: d.image, tone: 'rose', r: 44, note: d.imageNote });
   } else {
     TN.picture(s, p, { x: MX, y: y0, w: CW, h: avail, image: d.image, note: d.imageNote, r: 32 });

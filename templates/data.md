@@ -33,7 +33,7 @@
 ```js
 async function metrics(p, d) {
   const s = p.addSlide();
-  s.background = { color: TN.hex(d.tone === 'light' ? C.n15 : C.white) };
+  s.background = { color: TN.hex(d.tone === 'light' ? C.surface : C.bg) };
   const y0 = TN.header(s, d);
 
   const items = d.items.slice(0, 4);
@@ -54,11 +54,11 @@ async function metrics(p, d) {
     const a = TN.accent(i, it.tone);
     const dark = it.fill === 'dark';
     const x = MX + i * (cw + gap);
-    TN.rect(s, p, { x, y: y0, w: cw, h: chH, r: 32, fill: dark ? C.n60 : i === 0 && !it.tone ? C.n15 : a.tint });
+    TN.rect(s, p, { x, y: y0, w: cw, h: chH, r: 32, fill: dark ? C.deepSoft : i === 0 && !it.tone ? C.surface : a.tint });
 
     if (it.icon) {
-      TN.rect(s, p, { x: x + pdx, y: y0 + pdy, w: chip, h: chip, r: 24, fill: dark ? '#7f8a9b' : C.white });
-      await TN.putIcon(s, it.icon, dark ? C.white : a.solid, { x: x + pdx + 22, y: y0 + pdy + 22, w: 44 });
+      TN.rect(s, p, { x: x + pdx, y: y0 + pdy, w: chip, h: chip, r: 24, fill: dark ? C.chip : C.bg });
+      await TN.putIcon(s, it.icon, dark ? C.onDeep : a.solid, { x: x + pdx + 22, y: y0 + pdy + 22, w: 44 });
     }
 
     const by = y0 + chH - pdy - blockHeight;
@@ -66,13 +66,13 @@ async function metrics(p, d) {
     const zoneTop = y0 + pdy + (it.icon ? chip + 16 : 0);
     const vy = Math.max(zoneTop, zoneTop + (by - 28 - zoneTop - vf.size * 1.05) / 2);
     s.addText([
-      { text: String(it.value), options: { bold: true, fontSize: TN.pt(vf.size), color: TN.hex(dark ? C.white : a.solid) } },
-      ...(it.unit ? [{ text: ' ' + it.unit, options: { bold: true, fontSize: TN.pt(vf.size * 0.48), color: TN.hex(dark ? C.white : a.solid) } }] : []),
+      { text: String(it.value), options: { bold: true, fontSize: TN.pt(vf.size), color: TN.hex(dark ? C.onDeep : a.solid) } },
+      ...(it.unit ? [{ text: ' ' + it.unit, options: { bold: true, fontSize: TN.pt(vf.size * 0.48), color: TN.hex(dark ? C.onDeep : a.solid) } }] : []),
     ], { x: px(x + pdx), y: px(vy), w: px(cw - pdx * 2), h: px(vf.size * 1.15), isTextBox: true, margin: 0, fontFace: TN.FONT, valign: 'bottom', lineSpacing: TN.pt(vf.size) });
 
     const tH = TN.blockH(it.title, cw - pdx * 2, 34, true, 1.15);
-    TN.txt(s, it.title, { x: x + pdx, y: by, w: cw - pdx * 2, h: tH + 4, size: 34, bold: true, lh: 1.15, color: dark ? C.white : C.n100 });
-    if (it.note) TN.txt(s, it.note, { x: x + pdx, y: by + tH + 14, w: cw - pdx * 2, h: blockHeight - tH - 10, size: T.small, lh: 1.45, color: dark ? C.n30 : C.n60 });
+    TN.txt(s, it.title, { x: x + pdx, y: by, w: cw - pdx * 2, h: tH + 4, size: 34, bold: true, lh: 1.15, color: dark ? C.onDeep : C.ink });
+    if (it.note) TN.txt(s, it.note, { x: x + pdx, y: by + tH + 14, w: cw - pdx * 2, h: blockHeight - tH - 10, size: T.small, lh: 1.45, color: dark ? C.onDeepDim : C.muted });
   }
   chrome(s, p);
 }
@@ -118,13 +118,13 @@ await metrics(p, {
 ```js
 function table(p, d) {
   const s = p.addSlide();
-  s.background = { color: TN.hex(C.white) };
+  s.background = { color: TN.hex(C.bg) };
   const y0 = TN.header(s, d);
   const bottom = TN.contentBottom();
 
   const head = d.columns.map((c) => ({
     text: typeof c === 'string' ? c : c.title,
-    options: { bold: true, color: TN.hex(C.white), fill: { color: TN.hex(C.n100) }, fontSize: TN.pt(25),
+    options: { bold: true, color: TN.hex(C.onDeep), fill: { color: TN.hex(C.deep) }, fontSize: TN.pt(25),
       align: (c.align) || 'left', valign: 'middle', margin: [TN.pt(18), TN.pt(22), TN.pt(18), TN.pt(22)] },
   }));
   const body = d.rows.map((r, ri) => r.map((cell, ci) => {
@@ -134,9 +134,9 @@ function table(p, d) {
     return {
       text: String(obj ? cell.text : cell),
       options: {
-        color: TN.hex(a ? a.solid : (col.strong || ci === 0) ? C.n100 : C.n60),
+        color: TN.hex(a ? a.solid : (col.strong || ci === 0) ? C.ink : C.muted),
         bold: !!(col.strong || ci === 0 || (obj && cell.bold)),
-        fill: { color: TN.hex(ri % 2 ? C.n10 : C.white) },
+        fill: { color: TN.hex(ri % 2 ? C.surfaceAlt : C.bg) },
         fontSize: TN.pt(d.dense ? 22 : 25), align: col.align || 'left', valign: 'middle',
         margin: [TN.pt(16), TN.pt(22), TN.pt(16), TN.pt(22)],
       },
@@ -215,7 +215,7 @@ table(p, {
 ```js
 function chart(p, d) {
   const s = p.addSlide();
-  s.background = { color: TN.hex(C.white) };
+  s.background = { color: TN.hex(C.bg) };
   const y0 = TN.header(s, d);
   const bottom = TN.contentBottom();
   const cfg = d.chart;
@@ -227,8 +227,8 @@ function chart(p, d) {
   const series = cfg.series.map((sr) => ({ name: sr.name || '', labels: cats, values: flip ? sr.values.slice().reverse() : sr.values }));
 
   const round = kind === 'pie' || kind === 'doughnut';
-  const palette = [C.red60, C.blue60, C.green50, C.orange45, C.purple60, C.yellow50];
-  const colors = (cfg.colors || (series.length === 1 && !round ? [C.red60] : palette)).map(TN.hex);
+  const palette = TN.ACCENTS.map((a) => a.solid);       // акценты активной темы
+  const colors = (cfg.colors || (series.length === 1 && !round ? [C.accent] : palette)).map(TN.hex);
   const type = { column: p.ChartType.bar, bar: p.ChartType.bar, line: p.ChartType.line,
     area: p.ChartType.area, pie: p.ChartType.pie, doughnut: p.ChartType.doughnut }[kind];
 
@@ -241,7 +241,7 @@ function chart(p, d) {
     showValue: cfg.showValue !== false && kind !== 'line' && kind !== 'area',
     dataLabelPosition: round ? 'bestFit' : cfg.stacked ? 'ctr' : 'outEnd',
     dataLabelFontSize: TN.pt(22), dataLabelFontFace: TN.FONT,
-    dataLabelColor: TN.hex(round ? C.white : C.n60),
+    dataLabelColor: TN.hex(round ? C.onAccent : C.muted),
     dataLabelFormatCode: cfg.format,
     catAxisLabelColor: TN.hex(C.n60), catAxisLabelFontSize: TN.pt(23), catAxisLabelFontFace: TN.FONT,
     valAxisLabelColor: TN.hex(C.n60), valAxisLabelFontSize: TN.pt(23), valAxisLabelFontFace: TN.FONT,

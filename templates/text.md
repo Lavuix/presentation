@@ -30,7 +30,7 @@
 ```js
 function agenda(p, d) {
   const s = p.addSlide();
-  s.background = { color: TN.hex(C.white) };
+  s.background = { color: TN.hex(C.bg) };
   const y0 = TN.header(s, d);
 
   const items = d.items;
@@ -94,7 +94,7 @@ agenda(p, {
 ```js
 function bulletsSlide(p, d) {
   const s = p.addSlide();
-  s.background = { color: TN.hex(d.tone === 'light' ? C.n15 : C.white) };
+  s.background = { color: TN.hex(d.tone === 'light' ? C.surface : C.bg) };
   const y0 = TN.header(s, d);
 
   const cols = d.columns || 1;
@@ -153,7 +153,7 @@ bulletsSlide(p, {
 ```js
 async function features(p, d) {
   const s = p.addSlide();
-  s.background = { color: TN.hex(d.tone === 'light' ? C.n15 : C.white) };
+  s.background = { color: TN.hex(d.tone === 'light' ? C.surface : C.bg) };
   const y0 = TN.header(s, d);
 
   const items = d.items.slice(0, 6);
@@ -221,7 +221,7 @@ await features(p, {
 ```js
 async function cards(p, d) {
   const s = p.addSlide();
-  s.background = { color: TN.hex(d.tone === 'light' ? C.n15 : C.white) };
+  s.background = { color: TN.hex(d.tone === 'light' ? C.surface : C.bg) };
   const y0 = TN.header(s, d);
 
   const items = d.items.slice(0, 8);
@@ -250,9 +250,9 @@ async function cards(p, d) {
     TN.rect(s, p, { x, y, w: cw, h: ch, r: 28, fill: solid ? a.solid : it.fill === 'plain' ? C.n15 : a.tint });
 
     let cy = y + pdy;
-    if (it.icon && await TN.putIcon(s, it.icon, solid ? C.white : a.solid, { x: x + pdx, y: cy, w: 44 })) cy += 62;
+    if (it.icon && await TN.putIcon(s, it.icon, solid ? C.onAccent : a.solid, { x: x + pdx, y: cy, w: 44 })) cy += 62;
     const tH = TN.blockH(it.title, cw - pdx * 2, T.h3, true, 1.15);
-    TN.txt(s, it.title, { x: x + pdx, y: cy, w: cw - pdx * 2, h: tH + 6, size: T.h3, bold: true, lh: 1.15, color: solid ? C.white : C.n100 });
+    TN.txt(s, it.title, { x: x + pdx, y: cy, w: cw - pdx * 2, h: tH + 6, size: T.h3, bold: true, lh: 1.15, color: solid ? C.onAccent : C.ink });
     cy += tH + 10;
     if (it.text) TN.txt(s, it.text, { x: x + pdx, y: cy, w: cw - pdx * 2, h: Math.max(30, y + ch - pdy - cy), size: T.small, lh: 1.42, color: solid ? C.onRedDim : C.n60 });
   }
@@ -301,7 +301,7 @@ await cards(p, {
 ```js
 function quote(p, d) {
   const s = p.addSlide();
-  s.background = { color: TN.hex(d.tone === 'light' ? C.n15 : C.white) };
+  s.background = { color: TN.hex(d.tone === 'light' ? C.surface : C.bg) };
   const w = 1440, x = (W - w) / 2;
 
   const ft = TN.fit(d.text, { w: w - 40, h: 420, size: T.quote, min: 38, bold: true, lh: 1.25 });
