@@ -1,0 +1,7 @@
+node_modules/
+*.pdf
+slide-*.jpg
+slide-*.png
+out.pptx
+examples/**/*.pptx
+.DS_Store

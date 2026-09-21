@@ -1,0 +1,13 @@
+{
+  "name": "tn-presentation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Свод правил и макеты слайдов ТЕХНОНИКОЛЬ для сборки презентаций",
+  "scripts": {
+    "example": "node examples/tn-life-strategy/build.js"
+  },
+  "dependencies": {
+    "pptxgenjs": "^3.12.0",
+    "sharp": "^0.33.0"
+  }
+}

@@ -1,0 +1,63 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300..800&display=swap");
+/* TN Life — Typography (Inter, шкала @life_uikit/uikit)
+   Шрифт: вариативный Inter. Шкала намеренно компактнее старой (Proxima Nova):
+   у Inter больше x-height, поэтому дизайнеры уменьшили кегль и интерлиньяж.
+   Размеры и интерлиньяж — в rem от корня 15px (см. блок html ниже). */
+:root {
+  /* family */
+  --font-family-heading: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-family-body: var(--font-family-heading);
+
+  /* weight — всегда безразмерное число */
+  --font-weight-text: 400;
+  --font-weight-accent: 500;
+  --font-weight-heading: 600;
+
+  /* size — rem, база 1rem = 15px */
+  --font-size-label-small: 0.6667rem;     /* 10px */
+  --font-size-label-medium: 0.7333rem;    /* 11px */
+  --font-size-body-small: 0.8667rem;      /* 13px */
+  --font-size-title-small: 0.8667rem;     /* 13px */
+  --font-size-body-medium: 1rem;          /* 15px */
+  --font-size-title-medium: 1rem;         /* 15px */
+  --font-size-headline-small: 1.2rem;     /* 18px */
+  --font-size-headline-medium: 1.4667rem; /* 22px */
+  --font-size-headline-large: 1.7333rem;  /* 26px */
+
+  /* line-height — имя камелкейсом (--font-lineHeight-*), как экспортирует Figma */
+  --font-lineHeight-label-small: 0.9333rem;     /* 14px */
+  --font-lineHeight-label-medium: 1.1333rem;    /* 17px */
+  --font-lineHeight-title-small: 1.2rem;        /* 18px */
+  --font-lineHeight-body-small: 1.3333rem;      /* 20px */
+  --font-lineHeight-title-medium: 1.4rem;       /* 21px */
+  --font-lineHeight-body-medium: 1.5333rem;     /* 23px */
+  --font-lineHeight-headline-small: 1.6rem;     /* 24px */
+  --font-lineHeight-headline-medium: 2rem;      /* 30px */
+  --font-lineHeight-headline-large: 2.3333rem;  /* 35px */
+
+  /* --- Legacy-алиасы (старая шкала Proxima Nova). Не использовать в новом коде;
+         значения перевязаны на новую шкалу, чтобы старые потребители не ломались. --- */
+  --font-family: var(--font-family-body);
+  --font-weight-light: 300;
+  --font-weight-regular: var(--font-weight-text);
+  --font-weight-semibold: var(--font-weight-accent);
+  --font-weight-bold: var(--font-weight-heading);
+  --font-weight-extrabold: 800;
+  --text-xs: var(--font-size-label-medium);
+  --text-sm: var(--font-size-body-small);
+  --text-base: var(--font-size-body-medium);
+  --text-lg: var(--font-size-headline-small);
+  --text-xl: var(--font-size-headline-medium);
+  --text-2xl: var(--font-size-headline-large);
+  --text-3xl: 2.6667rem; /* 40px — вне шкалы, разовое дизайнерское значение */
+  --line-height-xs: var(--font-lineHeight-label-medium);
+  --line-height-sm: var(--font-lineHeight-body-small);
+  --line-height-base: var(--font-lineHeight-body-medium);
+  --line-height-lg: var(--font-lineHeight-headline-small);
+  --line-height-xl: var(--font-lineHeight-headline-medium);
+  --line-height-2xl: var(--font-lineHeight-headline-large);
+  --line-height-3xl: 3.2rem; /* 48px */
+}
+/* База rem — литералом на корне документа, НЕ через var() (иначе циклическая зависимость). */
+html { font-size: 15px; }
+body { font-family: var(--font-family-body); }

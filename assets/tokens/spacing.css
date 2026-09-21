@@ -1,0 +1,35 @@
+/* TN Life — Spacing & Layout */
+:root {
+  --space-0: 0;
+  --space-2: 2px;
+  --space-4: 4px;
+  --space-6: 6px;
+  --space-8: 8px;
+  --space-10: 10px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --space-40: 40px;
+  --space-48: 48px;
+  --space-64: 64px;
+  /* Border radii */
+  --radius-0: 0;
+  --radius-2: 2px;
+  --radius-4: 4px;
+  --radius-6: 6px;
+  --radius-8: 8px;
+  --radius-10: 10px;
+  --radius-12: 12px;
+  --radius-16: 16px;
+  --radius-full: 50px;
+  --radius-circle: 50%;
+  /* Transitions */
+  --transition-fast: 0.1s linear; /* @kind other */
+  --transition-base: 0.2s linear; /* @kind other */
+  --transition-slow: 0.3s linear; /* @kind other */
+  --transition-ease: 0.25s ease; /* @kind other */
+  /* Breakpoints (reference only — not usable in var()) */
+  --breakpoint-mobile: 768px;
+}
